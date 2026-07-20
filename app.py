@@ -18,7 +18,7 @@ from rag.pipeline import RagPipeline
 
 st.set_page_config(
     page_title="Assistant documentaire Lite RAG",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 st.markdown(
@@ -86,6 +86,29 @@ try:
 except Exception as exc:  # corpus manquant, etc.
     pipeline_ready = False
     st.error(f"Impossible d'initialiser le pipeline : {exc}")
+
+with st.sidebar:
+    st.markdown("## Configuration")
+    st.markdown(
+        f"**Modèle LLM (Ollama)**\n\n`{config.OLLAMA_MODEL}`\n\n"
+        f"**Modèle d'embedding**\n\n`all-MiniLM-L6-v2` (ChromaDB)"
+    )
+    st.divider()
+    st.markdown("## Corpus")
+    if pipeline_ready:
+        st.markdown(
+            f"- Fichier : `{pipeline.corpus_path}`\n"
+            f"- Segments indexés : **{pipeline.n_chunks}**\n"
+            f"- Taille de segment : **{pipeline.chunk_size}** caractères\n"
+            f"- Chevauchement : **{pipeline.chunk_overlap}** caractères\n"
+            f"- Segments récupérés (top-k) : **{config.TOP_K}**"
+        )
+    st.divider()
+    st.caption(
+        "Paramètres modifiables via le fichier `.env` "
+        "(voir `.env.example`). Journal des requêtes : "
+        f"`{config.LOG_FILE}`."
+    )
 
 st.markdown('<div class="app-title">Assistant documentaire Lite RAG</div>', unsafe_allow_html=True)
 st.markdown(
