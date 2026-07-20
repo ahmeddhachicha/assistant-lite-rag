@@ -18,45 +18,56 @@ from rag.pipeline import RagPipeline
 
 st.set_page_config(
     page_title="Assistant documentaire Lite RAG",
-    layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 st.markdown(
     """
     <style>
-    .block-container { padding-top: 2rem; max-width: 1100px; }
-    .answer-card {
-        background: linear-gradient(135deg, #f8f9fb 0%, #eef1f6 100%);
-        border: 1px solid #dde3ec;
-        border-left: 5px solid #4f6df5;
-        border-radius: 10px;
-        padding: 1.2rem 1.4rem;
-        font-size: 1.05rem;
-        line-height: 1.6;
+    .block-container { max-width: 48rem; padding-top: 1.5rem; }
+    header[data-testid="stHeader"] { background: transparent; }
+    .app-title {
+        text-align: center;
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+    }
+    .app-subtitle {
+        text-align: center;
+        color: #8e8ea0;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+    }
+    div[data-testid="stChatMessage"] {
+        background: transparent;
+        padding: 0.4rem 0;
+    }
+    div[data-testid="stChatMessage"]:has(div[data-testid="stChatMessageAvatarUser"]) {
+        background: #f2f4f8;
+        border-radius: 1rem;
+        padding: 0.4rem 0.9rem;
+    }
+    .meta-line {
+        color: #8e8ea0;
+        font-size: 0.78rem;
+        margin-top: 0.5rem;
     }
     .passage-card {
-        background: #fafbfc;
+        background: #f7f7f8;
         border: 1px solid #e6e9ef;
         border-radius: 8px;
-        padding: 0.9rem 1.1rem;
-        margin-bottom: 0.6rem;
-        font-size: 0.92rem;
-        line-height: 1.55;
-        color: #333;
+        padding: 0.7rem 0.9rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.86rem;
+        line-height: 1.5;
+        color: #40414f;
     }
     .passage-meta {
-        font-size: 0.78rem;
-        color: #6b7280;
-        margin-bottom: 0.35rem;
+        font-size: 0.72rem;
+        color: #8e8ea0;
+        margin-bottom: 0.3rem;
         text-transform: uppercase;
         letter-spacing: 0.04em;
-    }
-    div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid #e6e9ef;
-        border-radius: 10px;
-        padding: 0.8rem 1rem;
     }
     </style>
     """,
@@ -76,70 +87,28 @@ except Exception as exc:  # corpus manquant, etc.
     pipeline_ready = False
     st.error(f"Impossible d'initialiser le pipeline : {exc}")
 
-# ---------------------------------------------------------------- En-tête
-st.title("Assistant documentaire Lite RAG")
+st.markdown('<div class="app-title">Assistant documentaire Lite RAG</div>', unsafe_allow_html=True)
 st.markdown(
-    "Posez une question en langage naturel sur le corpus fourni "
-    "*(discours d'investiture présidentielle, 2013)*. L'application retrouve "
-    "les passages pertinents et génère une réponse **fondée uniquement sur "
-    "ceux-ci** — elle signale toute information absente du corpus."
+    '<div class="app-subtitle">Posez une question sur le corpus '
+    "(discours d'investiture présidentielle, 2013) — les réponses sont "
+    "fondées uniquement sur les passages retrouvés.</div>",
+    unsafe_allow_html=True,
 )
-st.divider()
 
-# ---------------------------------------------------------------- Question
-with st.form("question_form"):
-    question = st.text_input(
-        "Votre question",
-        placeholder="Ex. : Que dit le discours sur le changement climatique ?",
-        label_visibility="collapsed",
-    )
-    submitted = st.form_submit_button(
-        "Rechercher", type="primary", use_container_width=True
-    )
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-if "history" not in st.session_state:
-    st.session_state.history = []
 
-if submitted and pipeline_ready:
-    if not question.strip():
-        st.warning("Veuillez saisir une question avant de lancer la recherche.")
-    else:
-        try:
-            with st.spinner("Recherche des passages et génération de la réponse…"):
-                result = pipeline.ask(question.strip(), top_k=config.TOP_K)
-        except OllamaUnavailableError as exc:
-            st.error(str(exc))
-        except Exception as exc:
-            st.error(f"Erreur inattendue : {exc}")
-        else:
-            st.session_state.history.insert(
-                0,
-                {
-                    "Question": question.strip(),
-                    "Modèle": config.OLLAMA_MODEL,
-                    "Statut": result["status"],
-                    "Segments": result["n_segments"],
-                    "Temps (s)": result["elapsed_seconds"],
-                },
-            )
-
-            if result["status"] == "hors_corpus":
-                st.info("L'information demandée n'est pas présente dans le corpus.")
-
-            st.markdown("### Réponse")
-            st.markdown(
-                f'<div class="answer-card">{result["answer"]}</div>',
-                unsafe_allow_html=True,
-            )
-            st.write("")
-
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Temps de traitement", f'{result["elapsed_seconds"]} s')
-            col2.metric("Segments récupérés", result["n_segments"])
-            col3.metric("Modèle", config.OLLAMA_MODEL)
-
-            st.markdown("### Passages utilisés")
-            for i, passage in enumerate(result["passages"], start=1):
+def render_assistant(message: dict) -> None:
+    st.write(message["content"])
+    if message.get("meta"):
+        st.markdown(
+            f'<div class="meta-line">{message["meta"]}</div>',
+            unsafe_allow_html=True,
+        )
+    if message.get("passages"):
+        with st.expander(f"Passages utilisés ({len(message['passages'])})"):
+            for i, passage in enumerate(message["passages"], start=1):
                 st.markdown(
                     f'<div class="passage-card">'
                     f'<div class="passage-meta">Passage {i} — distance : '
@@ -147,9 +116,46 @@ if submitted and pipeline_ready:
                     unsafe_allow_html=True,
                 )
 
-# ---------------------------------------------------------------- Historique
-if st.session_state.history:
-    st.divider()
-    with st.expander(f"Historique de la session ({len(st.session_state.history)} requête(s))"):
-        st.dataframe(st.session_state.history, use_container_width=True)
-        st.caption(f"Journal complet : `{config.LOG_FILE}`")
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        if message["role"] == "assistant":
+            render_assistant(message)
+        else:
+            st.write(message["content"])
+
+question = st.chat_input("Posez votre question…", disabled=not pipeline_ready)
+
+if question is not None and pipeline_ready:
+    if not question.strip():
+        st.warning("Veuillez saisir une question avant de lancer la recherche.")
+    else:
+        question = question.strip()
+        st.session_state.messages.append({"role": "user", "content": question})
+        with st.chat_message("user"):
+            st.write(question)
+
+        with st.chat_message("assistant"):
+            try:
+                with st.spinner("Recherche dans le corpus…"):
+                    result = pipeline.ask(question, top_k=config.TOP_K)
+            except OllamaUnavailableError as exc:
+                message = {"role": "assistant", "content": str(exc)}
+                st.session_state.messages.append(message)
+                render_assistant(message)
+            except Exception as exc:
+                message = {"role": "assistant", "content": f"Erreur inattendue : {exc}"}
+                st.session_state.messages.append(message)
+                render_assistant(message)
+            else:
+                message = {
+                    "role": "assistant",
+                    "content": result["answer"],
+                    "meta": (
+                        f'{config.OLLAMA_MODEL} · {result["elapsed_seconds"]} s · '
+                        f'{result["n_segments"]} segments récupérés'
+                    ),
+                    "passages": result["passages"],
+                }
+                st.session_state.messages.append(message)
+                render_assistant(message)
