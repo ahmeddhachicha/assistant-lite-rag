@@ -100,7 +100,6 @@ with st.sidebar:
             f"- Fichier : `{pipeline.corpus_path}`\n"
             f"- Segments indexés : **{pipeline.n_chunks}**\n"
             f"- Taille de segment : **{pipeline.chunk_size}** caractères\n"
-            f"- Chevauchement : **{pipeline.chunk_overlap}** caractères\n"
             f"- Segments récupérés (top-k) : **{config.TOP_K}**"
         )
     st.divider()
