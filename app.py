@@ -102,13 +102,6 @@ with st.sidebar:
             f"- Taille de segment : **{pipeline.chunk_size}** caractères\n"
             f"- Segments récupérés (top-k) : **{config.TOP_K}**"
         )
-    st.divider()
-    st.caption(
-        "Paramètres modifiables via le fichier `.env` "
-        "(voir `.env.example`). Journal des requêtes : "
-        f"`{config.LOG_FILE}`."
-    )
-
 st.markdown('<div class="app-title">Assistant documentaire Lite RAG</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="app-subtitle">Posez une question sur le corpus '
