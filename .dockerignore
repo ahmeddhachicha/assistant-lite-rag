@@ -1,0 +1,11 @@
+.git
+__pycache__/
+*.pyc
+venv/
+.venv/
+.env
+logs/
+chroma_db/
+*.pdf
+tests/
+README.md

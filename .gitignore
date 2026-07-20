@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+.env
+logs/
+chroma_db/
+Examen_Final_Fil_Rouge_Module_MLOps_IA1_Versailles.pdf
