@@ -4,6 +4,16 @@ Les embeddings sont calculés par la fonction d'embedding par défaut de
 ChromaDB (all-MiniLM-L6-v2 via ONNX, exécutée localement).
 """
 
+# Streamlit Community Cloud : remplace le sqlite3 système (trop ancien
+# pour ChromaDB) par pysqlite3-binary quand il est disponible
+try:
+    __import__("pysqlite3")
+    import sys
+
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+except ImportError:
+    pass
+
 import chromadb
 
 

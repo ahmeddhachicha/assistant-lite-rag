@@ -1,6 +1,16 @@
 """Webapp Streamlit — Assistant documentaire Lite RAG."""
 
+import os
+
 import streamlit as st
+
+# Streamlit Community Cloud : recopie les secrets (OLLAMA_URL, etc.) dans
+# l'environnement avant le chargement de la configuration
+try:
+    for _key, _value in st.secrets.items():
+        os.environ.setdefault(_key, str(_value))
+except Exception:
+    pass
 
 from rag import config
 from rag.llm import OllamaUnavailableError
@@ -8,8 +18,8 @@ from rag.pipeline import RagPipeline
 
 st.set_page_config(
     page_title="Assistant documentaire Lite RAG",
-    page_icon="📚",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
 st.markdown(
@@ -53,63 +63,21 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------------------------------------------------------------- Sidebar
-with st.sidebar:
-    st.markdown("## ⚙️ Paramètres")
-    model = st.text_input(
-        "Modèle Ollama",
-        value=config.OLLAMA_MODEL,
-        help="Le modèle doit être téléchargé : `ollama pull <modele>`",
-    )
-    chunk_size = st.slider(
-        "Taille des segments (caractères)",
-        min_value=200,
-        max_value=2000,
-        value=config.CHUNK_SIZE,
-        step=100,
-        help="Modifier cette valeur reconstruit l'index vectoriel.",
-    )
-    top_k = st.slider(
-        "Segments récupérés (top-k)",
-        min_value=1,
-        max_value=10,
-        value=config.TOP_K,
-    )
-
-    st.divider()
-    st.markdown("## 📖 À propos")
-    st.markdown(
-        "Pipeline **Lite RAG** : le corpus est découpé en segments, "
-        "indexé dans **ChromaDB** (base vectorielle locale), puis les "
-        "passages les plus proches de la question sont transmis au LLM "
-        "via **Ollama** qui répond uniquement à partir de ceux-ci."
-    )
-
 
 @st.cache_resource(show_spinner="Indexation du corpus…")
-def get_pipeline(chunk_size: int, model: str) -> RagPipeline:
-    return RagPipeline(chunk_size=chunk_size, model=model)
+def get_pipeline() -> RagPipeline:
+    return RagPipeline()
 
 
 pipeline_ready = True
 try:
-    pipeline = get_pipeline(int(chunk_size), model)
+    pipeline = get_pipeline()
 except Exception as exc:  # corpus manquant, etc.
     pipeline_ready = False
     st.error(f"Impossible d'initialiser le pipeline : {exc}")
 
-with st.sidebar:
-    if pipeline_ready:
-        st.divider()
-        st.markdown("## 🗂️ Corpus")
-        st.markdown(
-            f"- Fichier : `{pipeline.corpus_path}`\n"
-            f"- Segments indexés : **{pipeline.n_chunks}**\n"
-            f"- Taille de segment : **{pipeline.chunk_size}** caractères"
-        )
-
 # ---------------------------------------------------------------- En-tête
-st.title("📚 Assistant documentaire Lite RAG")
+st.title("Assistant documentaire Lite RAG")
 st.markdown(
     "Posez une question en langage naturel sur le corpus fourni "
     "*(discours d'investiture présidentielle, 2013)*. L'application retrouve "
@@ -126,7 +94,7 @@ with st.form("question_form"):
         label_visibility="collapsed",
     )
     submitted = st.form_submit_button(
-        "🔍 Rechercher", type="primary", use_container_width=True
+        "Rechercher", type="primary", use_container_width=True
     )
 
 if "history" not in st.session_state:
@@ -134,21 +102,21 @@ if "history" not in st.session_state:
 
 if submitted and pipeline_ready:
     if not question.strip():
-        st.warning("⚠️ Veuillez saisir une question avant de lancer la recherche.")
+        st.warning("Veuillez saisir une question avant de lancer la recherche.")
     else:
         try:
             with st.spinner("Recherche des passages et génération de la réponse…"):
-                result = pipeline.ask(question.strip(), top_k=int(top_k))
+                result = pipeline.ask(question.strip(), top_k=config.TOP_K)
         except OllamaUnavailableError as exc:
-            st.error(f"🔌 {exc}")
+            st.error(str(exc))
         except Exception as exc:
-            st.error(f"❌ Erreur inattendue : {exc}")
+            st.error(f"Erreur inattendue : {exc}")
         else:
             st.session_state.history.insert(
                 0,
                 {
                     "Question": question.strip(),
-                    "Modèle": model,
+                    "Modèle": config.OLLAMA_MODEL,
                     "Statut": result["status"],
                     "Segments": result["n_segments"],
                     "Temps (s)": result["elapsed_seconds"],
@@ -156,9 +124,9 @@ if submitted and pipeline_ready:
             )
 
             if result["status"] == "hors_corpus":
-                st.info("ℹ️ L'information demandée n'est pas présente dans le corpus.")
+                st.info("L'information demandée n'est pas présente dans le corpus.")
 
-            st.markdown("### 💬 Réponse")
+            st.markdown("### Réponse")
             st.markdown(
                 f'<div class="answer-card">{result["answer"]}</div>',
                 unsafe_allow_html=True,
@@ -166,11 +134,11 @@ if submitted and pipeline_ready:
             st.write("")
 
             col1, col2, col3 = st.columns(3)
-            col1.metric("⏱️ Temps de traitement", f'{result["elapsed_seconds"]} s')
-            col2.metric("📄 Segments récupérés", result["n_segments"])
-            col3.metric("🤖 Modèle", model)
+            col1.metric("Temps de traitement", f'{result["elapsed_seconds"]} s')
+            col2.metric("Segments récupérés", result["n_segments"])
+            col3.metric("Modèle", config.OLLAMA_MODEL)
 
-            st.markdown("### 📎 Passages utilisés")
+            st.markdown("### Passages utilisés")
             for i, passage in enumerate(result["passages"], start=1):
                 st.markdown(
                     f'<div class="passage-card">'
@@ -182,6 +150,6 @@ if submitted and pipeline_ready:
 # ---------------------------------------------------------------- Historique
 if st.session_state.history:
     st.divider()
-    with st.expander(f"📊 Historique de la session ({len(st.session_state.history)} requête(s))"):
+    with st.expander(f"Historique de la session ({len(st.session_state.history)} requête(s))"):
         st.dataframe(st.session_state.history, use_container_width=True)
         st.caption(f"Journal complet : `{config.LOG_FILE}`")
