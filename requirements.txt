@@ -3,4 +3,5 @@ chromadb>=0.5
 requests>=2.31
 python-dotenv>=1.0
 # Streamlit Community Cloud : sqlite3 système trop ancien pour ChromaDB
-pysqlite3-binary; sys_platform == 'linux'
+# (wheels x86_64 uniquement — ignoré sur Docker arm64)
+pysqlite3-binary; sys_platform == 'linux' and platform_machine == 'x86_64'
